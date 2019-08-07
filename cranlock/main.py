@@ -11,9 +11,9 @@ from cranlock import lock
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
 DESCRIPTION = """
-Locks all R dependencies and transient dependencies for reproducible builds.
+Locks all R dependencies and transitive dependencies for reproducible builds.
 Relies on a docker image with the dependencies installed to sort out the proper
-versions for transient dependencies.
+versions for transitive dependencies.
 """
 
 
