@@ -1,1 +1,1 @@
-from cranlock import main
+from cranlock import main, lock

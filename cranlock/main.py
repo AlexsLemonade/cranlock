@@ -3,6 +3,8 @@ import subprocess
 import sys
 import os
 
+from cranlock import lock
+
 # Steps:
 # Take as an arguments a package file and a docker container
 
@@ -60,20 +62,17 @@ The default is \'dependencies.R\' in the same directory as \'package_file\'.')
         sys.exit(1)
 
     # Parse the dependency tree and generate the final R script
-    lock_command = "python {dir}/lock.py {packages} {versions} > {output}"
-    lock_po = subprocess.Popen(lock_command.format(dir=SCRIPT_DIRECTORY,
-                                                   packages=package_file,
-                                                   versions=version_file,
-                                                   output=output_file),
-                               shell=True, stderr=subprocess.PIPE)
+    package_file = open(package_file, 'r')
+    version_file = open(version_file, 'r')
+    output_file = open(output_file, 'w')
 
-    for line in lock_po.stderr:
-        print(line.decode('utf-8'), end='', file=sys.stderr)
-
-    lock_po.wait()
-
-    if lock_po.returncode != 0:
-        print("Error: could not create the 'dependencies.R' file", file=sys.stderr)
+    try:
+        lock.main(package_file, version_file, output_file)
+    except Exception as e:
+        print(e)
+        package_file.close()
+        version_file.close()
+        output_file.close()
 
         if os.path.exists(version_file):
             os.remove(version_file)

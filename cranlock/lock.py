@@ -2,6 +2,7 @@ import argparse
 from bs4 import BeautifulSoup
 from enum import Enum
 from functools import reduce
+import os
 import re
 import requests
 
@@ -184,20 +185,7 @@ def extract_name_and_version(input_line: str) -> (str, str):
     return (name, version)
 
 
-if __name__ == "__main__":
-    # Initialize the argument parser
-    parser = argparse.ArgumentParser(description='Parse a list of R dependencies and topologically \
-sort the dependency graph.')
-    parser.add_argument('input_file', type=argparse.FileType('r'),
-                        help='the input file for the dependencies')
-    parser.add_argument('version_file', type=argparse.FileType('r'),
-                        help='the file containing the version for each dependency')
-
-    # Parse the arguments into variables
-    args = parser.parse_args()
-    input_file = args.input_file
-    version_file = args.version_file
-
+def main(input_file, version_file, output_file):
     # Get the requested version of every package using extract_name_and_version
     versions = dict(map(extract_name_and_version, version_file))
 
@@ -206,11 +194,33 @@ sort the dependency graph.')
     sorted_packages = sort_dependency_graph(graph)
 
     # Write the output file
-    print("# Generated from cranlock")
-    print("options(warn=2)")
-    print("options(Ncpus=parallel::detectCores())")
-    print("options(repos=structure(c(CRAN=\"https://cran.revolutionanalytics.com\")))")
+    output_file.write("# Generated from cranlock\n")
+    output_file.write("options(warn=2)\n")
+    output_file.write("options(Ncpus=parallel::detectCores())\n")
+    output_file.write("options(repos=structure(c(CRAN=\"https://cran.revolutionanalytics.com\")))\n")
     for package in sorted_packages:
         if package in versions:
-            print("devtools::install_version('{package}', version='{version}')".format(
+            output_file.write("devtools::install_version('{package}', version='{version}')\n".format(
                 package=package, version=versions[package]))
+
+
+if __name__ == "__main__":
+    # Initialize the argument parser
+    parser = argparse.ArgumentParser(description='Parse a list of R dependencies and topologically \
+sort the dependency graph.')
+    parser.add_argument('input_file', type=argparse.FileType('r'),
+                        help='the input file for the dependencies')
+    parser.add_argument('version_file', type=argparse.FileType('r'),
+                        help='the file containing the version for each dependency')
+    parser.add_argument('--output-file', type=argparse.FileType('r'),
+                        help='the output file, or dependencies.R if none is specified')
+
+    # Parse the arguments into variables
+    args = parser.parse_args()
+    input_file = args.input_file
+    version_file = args.version_file
+    output_file = args.output_file
+    if output_file is None:
+        output_file = open(os.path.dirname(input_file) + "/dependencies.R", 'w')
+
+    main(input_file, version_file, output_file)
