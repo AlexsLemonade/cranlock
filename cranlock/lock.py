@@ -74,9 +74,6 @@ def get_all_dependencies(package: str):
 
     first_level_dependencies = get_dependencies(package)
 
-    if first_level_dependencies == []:
-        return []
-
     # Construct a dict from a list of tuples so that the reducer doesn't mutate anything
     return dict(reduce(lambda deps, dependency:
                        deps + [(dependency, get_all_dependencies(dependency))],
@@ -95,7 +92,7 @@ def add_to_graph(graph: dict, dependency_tree):
         if graph.get(dep, None) is None:
             graph[dep] = set()
 
-        if nesteds == []:
+        if nesteds == {}:
             continue
 
         for nested in nesteds.keys():
@@ -118,15 +115,6 @@ class Mark(Enum):
     Permanent = 0
     Temporary = 1
     Empty = 2
-
-
-def have_visited_all(visited: dict) -> bool:
-    """Have we visited all the nodes in the graph?"""
-    for mark in visited.values():
-        if mark == Mark.Empty:
-            return False
-
-    return True
 
 
 def get_first_unvisited(visited: dict) -> str:
@@ -165,12 +153,13 @@ def sort_dependency_graph(graph: dict):
 
     output = []
 
-    while not have_visited_all(visited):
-        node = get_first_unvisited(visited)
-
+    node = get_first_unvisited(visited)
+    while node is not None:
         visit(graph, node, visited, output)
 
         visited[node] = True
+
+        node = get_first_unvisited(visited)
 
     return output
 
@@ -179,7 +168,7 @@ def extract_name_and_version(input_line: str) -> (str, str):
     """Extract the name and version of a package from an input line from a versions.tsv file.
     The file format is TSV, with the name in the first column and the version in the second
     """
-    info = list(filter(lambda s: len(s) > 0, input_line.strip().split('\t')))
+    info = list(filter((lambda s: len(s) > 0), input_line.strip().split('\t')))
     name = info[0]
     version = info[1]
     return (name, version)
