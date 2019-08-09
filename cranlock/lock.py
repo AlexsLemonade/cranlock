@@ -7,20 +7,46 @@ import re
 import requests
 
 CRAN_PACKAGE_URL_FORMAT = "https://cran.r-project.org/web/packages/{package}/index.html"
+BIOCONDUCTOR_PACKAGE_URL_FORMAT = "https://doi.org/doi:10.18129/B9.bioc.{package}"
 
 
 def get_cran_url(package_name: str) -> str:
     return CRAN_PACKAGE_URL_FORMAT.format(package=package_name)
 
 
+def get_bioconductor_url(package_name: str) -> str:
+    return BIOCONDUCTOR_PACKAGE_URL_FORMAT.format(package=package_name)
+
+
+def is_bioconductor_package(package_name: str) -> bool:
+    """ Send a HEAD request to Bioconductor to see if the package's page exists """
+    return requests.head(get_bioconductor_url(package_name)).status_code < 400
+
+
 def get_table_row(table, td_text):
     """ Find a row in a table that has td_text as one column's text """
-    td = table.find('td', string=td_text)
+    td = table.find('td', string=re.compile(td_text))
 
     if td is None:
         return None
 
     return td.find_parent('tr')
+
+
+def get_package_url(package_name: str, is_bioconductor: bool) -> dict:
+    if is_bioconductor:
+        return get_bioconductor_url(package_name)
+    else:
+        return get_cran_url(package_name)
+
+
+def get_info_table_filter(is_bioconductor: bool) -> dict:
+    if is_bioconductor:
+        # Dependency information lives in an html table with the class name "details"
+        return {"class": 'details'}
+    else:
+        # Dependency information lives in an html table called 'Package $PKGNAME summary'
+        return {"summary": re.compile('Package [\\w\\W]+ summary')}
 
 
 # Cache the responses for all CRAN URLs we have visited, since a package often appears more than
@@ -29,8 +55,13 @@ url_cache = dict()
 
 
 def get_info_table(package: str):
-    """Get the HTML table from the CRAN site for a package, which holds all the dependency info"""
-    url = get_cran_url(package)
+    """Get the HTML table from the CRAN or Bioconductor site for a package,
+    which holds all the dependency info"""
+    is_bioconductor = is_bioconductor_package(package)
+
+    url = get_package_url(package, is_bioconductor)
+    info_table_filter = get_info_table_filter(is_bioconductor)
+
     if url_cache.get(url, None):
         response = url_cache[url]
     else:
@@ -38,12 +69,11 @@ def get_info_table(package: str):
         url_cache[url] = response
 
     if response.status_code != 200:
-        raise Exception("Package {} does not exist on CRAN".format(package))
+        raise Exception("Package {} does not exist".format(package))
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Dependency information lives in an html table called 'Package $PKGNAME summary'
-    return soup.find('table', summary=re.compile('Package [\\w\\W]+ summary'))
+    return soup.find('table', **info_table_filter)
 
 
 def get_dependencies(package: str):
@@ -53,8 +83,8 @@ def get_dependencies(package: str):
 
     table = get_info_table(package)
 
-    imports_row = get_table_row(table, "Imports:")
-    depends_row = get_table_row(table, "Depends:")
+    imports_row = get_table_row(table, "Imports")
+    depends_row = get_table_row(table, "Depends")
 
     imports = imports_row.find_all('a') if imports_row is not None else []
     depends = depends_row.find_all('a') if depends_row is not None else []
@@ -157,7 +187,7 @@ def sort_dependency_graph(graph: dict):
     while node is not None:
         visit(graph, node, visited, output)
 
-        visited[node] = True
+        visited[node] = Mark.Permanent
 
         node = get_first_unvisited(visited)
 
@@ -188,7 +218,7 @@ def main(input_file, version_file, output_file):
     output_file.write("options(Ncpus=parallel::detectCores())\n")
     output_file.write("options(repos=structure(c(CRAN=\"https://cran.revolutionanalytics.com\")))\n")
     for package in sorted_packages:
-        if package in versions:
+        if package in versions and not is_bioconductor_package(package):
             output_file.write("devtools::install_version('{package}', version='{version}')\n".format(
                 package=package, version=versions[package]))
 
