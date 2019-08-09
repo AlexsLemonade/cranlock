@@ -20,6 +20,9 @@ already installed. You need to do the R package installations via the `Dockerfil
 packages are accessible from a fresh `docker run -it`. You should also have a `packages.txt` file
 holding the names of all of your dependencies, one per line.
 
+NOTE: You can put bioconductor packages in `packages.txt`, but it will only install CRAN dependencies
+for those packages.
+
 To create a `dependencies.R` file, run `cranlock path_to_packages/packages.txt docker_container_name`.
 This will create a `versions.tsv` file holding the versions of all the R packages installed in your
 selected docker container, then use that file along with `packages.txt` to generate `dependencies.R`.
