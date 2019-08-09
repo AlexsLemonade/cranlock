@@ -24,6 +24,9 @@ To create a `dependencies.R` file, run `cranlock path_to_packages/packages.txt d
 This will create a `versions.tsv` file holding the versions of all the R packages installed in your
 selected docker container, then use that file along with `packages.txt` to generate `dependencies.R`.
 
+NOTE: `cranlock` may take a while to run with large dependency trees, because we need to visit the
+web page for each package to get its dependencies.
+
 ## Development
 This project uses `pipenv`, so when you clone the project run `pipenv install` to install the
 dependencies. To activate a virtual environment, use `pipenv shell`. The virtual environment
